@@ -1,4 +1,4 @@
-# WalletConnect Example Dapp
+# Meta TX Example Dapp
 
 ## Develop
 
