@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import { IAssetData, IGasPrices, IParsedTx } from "./types";
+import { IAssetData, /* IGasPrices */ IParsedTx } from "./types";
 
 const api: AxiosInstance = axios.create({
   baseURL: "https://ethereum-api.xyz",
@@ -25,14 +25,8 @@ export async function apiGetAccountTransactions(
   return result;
 }
 
-export const apiGetAccountNonce = async (address: string, chainId: number): Promise<string> => {
-  const response = await api.get(`/account-nonce?address=${address}&chainId=${chainId}`);
-  const { result } = response.data;
-  return result;
-};
-
-export const apiGetGasPrices = async (): Promise<IGasPrices> => {
+/* export const apiGetGasPrices = async (): Promise<IGasPrices> => {
   const response = await api.get(`/gas-prices`);
   const { result } = response.data;
   return result;
-};
+}; */

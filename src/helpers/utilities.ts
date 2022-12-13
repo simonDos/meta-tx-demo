@@ -1,82 +1,82 @@
-import { providers } from "ethers";
-import { convertUtf8ToHex } from "@walletconnect/utils";
-import { TypedDataUtils } from "eth-sig-util";
-import * as ethUtil from "ethereumjs-util";
-import { IChainData } from "./types";
-import { SUPPORTED_CHAINS } from "./chains";
-import { eip1271 } from "./eip1271";
+import { providers } from "ethers"
+import { convertUtf8ToHex } from "@walletconnect/utils"
+import { TypedDataUtils } from "eth-sig-util"
+import * as ethUtil from "ethereumjs-util"
+import { IChainData } from "./types"
+import { SUPPORTED_CHAINS } from "./chains"
+import { eip1271 } from "./eip1271"
 
 export function capitalize(string: string): string {
   return string
     .split(" ")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
+    .join(" ")
 }
 
 export function ellipseText(text = "", maxLength = 9999): string {
   if (text.length <= maxLength) {
-    return text;
+    return text
   }
-  const _maxLength = maxLength - 3;
-  let ellipse = false;
-  let currentLength = 0;
+  const _maxLength = maxLength - 3
+  let ellipse = false
+  let currentLength = 0
   const result =
     text
       .split(" ")
       .filter(word => {
-        currentLength += word.length;
+        currentLength += word.length
         if (ellipse || currentLength >= _maxLength) {
-          ellipse = true;
-          return false;
+          ellipse = true
+          return false
         } else {
-          return true;
+          return true
         }
       })
-      .join(" ") + "...";
-  return result;
+      .join(" ") + "..."
+  return result
 }
 
 export function ellipseAddress(address = "", width = 10): string {
-  return `${address.slice(0, width)}...${address.slice(-width)}`;
+  return `${address.slice(0, width)}...${address.slice(-width)}`
 }
 
 export function padLeft(n: string, width: number, z?: string): string {
-  z = z || "0";
-  n = n + "";
-  return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+  z = z || "0"
+  n = n + ""
+  return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n
 }
 
 export function sanitizeHex(hex: string): string {
-  hex = hex.substring(0, 2) === "0x" ? hex.substring(2) : hex;
+  hex = hex.substring(0, 2) === "0x" ? hex.substring(2) : hex
   if (hex === "") {
-    return "";
+    return ""
   }
-  hex = hex.length % 2 !== 0 ? "0" + hex : hex;
-  return "0x" + hex;
+  hex = hex.length % 2 !== 0 ? "0" + hex : hex
+  return "0x" + hex
 }
 
 export function removeHexPrefix(hex: string): string {
-  return hex.toLowerCase().replace("0x", "");
+  return hex.toLowerCase().replace("0x", "")
 }
 
 export function getDataString(func: string, arrVals: any[]): string {
-  let val = "";
+  let val = ""
   for (let i = 0; i < arrVals.length; i++) {
-    val += padLeft(arrVals[i], 64);
+    val += padLeft(arrVals[i], 64)
   }
-  const data = func + val;
-  return data;
+  const data = func + val
+  return data
 }
 
 export function isMobile(): boolean {
-  let mobile = false;
+  let mobile = false
 
   function hasTouchEvent(): boolean {
     try {
-      document.createEvent("TouchEvent");
-      return true;
+      document.createEvent("TouchEvent")
+      return true
     } catch (e) {
-      return false;
+      return false
     }
   }
 
@@ -89,93 +89,93 @@ export function isMobile(): boolean {
         navigator.userAgent.substr(0, 4),
       )
     ) {
-      return true;
+      return true
     } else if (hasTouchEvent()) {
-      return true;
+      return true
     }
-    return false;
+    return false
   }
 
-  mobile = hasMobileUserAgent();
+  mobile = hasMobileUserAgent()
 
-  return mobile;
+  return mobile
 }
 
 export function getChainData(chainId: number): IChainData {
-  const chainData = SUPPORTED_CHAINS.filter((chain: any) => chain.chain_id === chainId)[0];
+  const chainData = SUPPORTED_CHAINS.filter((chain: any) => chain.chain_id === chainId)[0]
 
   if (!chainData) {
-    throw new Error("ChainId missing or not supported");
+    throw new Error("ChainId missing or not supported")
   }
 
-  const API_KEY = process.env.REACT_APP_INFURA_PROJECT_ID;
+  const API_KEY = process.env.REACT_APP_INFURA_PROJECT_ID
 
   if (
     chainData.rpc_url.includes("infura.io") &&
     chainData.rpc_url.includes("%API_KEY%") &&
     API_KEY
   ) {
-    const rpcUrl = chainData.rpc_url.replace("%API_KEY%", API_KEY);
+    const rpcUrl = chainData.rpc_url.replace("%API_KEY%", API_KEY)
 
     return {
       ...chainData,
       rpc_url: rpcUrl,
-    };
+    }
   }
 
-  return chainData;
+  return chainData
 }
 
 export function encodePersonalMessage(msg: string): string {
-  const data = ethUtil.toBuffer(convertUtf8ToHex(msg));
+  const data = ethUtil.toBuffer(convertUtf8ToHex(msg))
   const buf = Buffer.concat([
     Buffer.from("\u0019Ethereum Signed Message:\n" + data.length.toString(), "utf8"),
     data,
-  ]);
-  return ethUtil.bufferToHex(buf);
+  ])
+  return ethUtil.bufferToHex(buf)
 }
 
 export function hashMessage(msg: string): string {
-  const data = encodePersonalMessage(msg);
-  const buf = ethUtil.toBuffer(data);
-  const hash = ethUtil.keccak256(buf);
-  return ethUtil.bufferToHex(hash);
+  const data = encodePersonalMessage(msg)
+  const buf = ethUtil.toBuffer(data)
+  const hash = ethUtil.keccak256(buf)
+  return ethUtil.bufferToHex(hash)
 }
 
 export function encodeTypedDataMessage(msg: string): string {
-  const data = TypedDataUtils.sanitizeData(JSON.parse(msg));
+  const data = TypedDataUtils.sanitizeData(JSON.parse(msg))
   const buf = Buffer.concat([
     Buffer.from("1901", "hex"),
     TypedDataUtils.hashStruct("EIP712Domain", data.domain, data.types),
     TypedDataUtils.hashStruct(data.primaryType as string, data.message, data.types),
-  ]);
-  return ethUtil.bufferToHex(buf);
+  ])
+  return ethUtil.bufferToHex(buf)
 }
 
 export function hashTypedDataMessage(msg: string): string {
-  const data = encodeTypedDataMessage(msg);
-  const buf = ethUtil.toBuffer(data);
-  const hash = ethUtil.keccak256(buf);
-  return ethUtil.bufferToHex(hash);
+  const data = encodeTypedDataMessage(msg)
+  const buf = ethUtil.toBuffer(data)
+  const hash = ethUtil.keccak256(buf)
+  return ethUtil.bufferToHex(hash)
 }
 
 export function recoverAddress(sig: string, hash: string): string {
-  const params = ethUtil.fromRpcSig(sig);
-  const result = ethUtil.ecrecover(ethUtil.toBuffer(hash), params.v, params.r, params.s);
-  const signer = ethUtil.bufferToHex(ethUtil.publicToAddress(result));
-  return signer;
+  const params = ethUtil.fromRpcSig(sig)
+  const result = ethUtil.ecrecover(ethUtil.toBuffer(hash), params.v, params.r, params.s)
+  const signer = ethUtil.bufferToHex(ethUtil.publicToAddress(result))
+  return signer
 }
 
 export function recoverMessageSignature(sig: string, msg: string): string {
-  const hash = hashMessage(msg);
-  const signer = recoverAddress(sig, hash);
-  return signer;
+  const hash = hashMessage(msg)
+  const signer = recoverAddress(sig, hash)
+  return signer
 }
 
 export function recoverTypedMessage(sig: string, msg: string): string {
-  const hash = hashTypedDataMessage(msg);
-  const signer = recoverAddress(sig, hash);
-  return signer;
+  const hash = hashTypedDataMessage(msg)
+  const signer = recoverAddress(sig, hash)
+  return signer
 }
 
 export async function verifySignature(
@@ -184,13 +184,13 @@ export async function verifySignature(
   hash: string,
   chainId: number,
 ): Promise<boolean> {
-  const rpcUrl = getChainData(chainId).rpc_url;
-  const provider = new providers.JsonRpcProvider(rpcUrl);
-  const bytecode = await provider.getCode(address);
+  const rpcUrl = getChainData(chainId).rpc_url
+  const provider = new providers.JsonRpcProvider(rpcUrl)
+  const bytecode = await provider.getCode(address)
   if (!bytecode || bytecode === "0x" || bytecode === "0x0" || bytecode === "0x00") {
-    const signer = recoverAddress(sig, hash);
-    return signer.toLowerCase() === address.toLowerCase();
+    const signer = recoverAddress(sig, hash)
+    return signer.toLowerCase() === address.toLowerCase()
   } else {
-    return eip1271.isValidSignature(address, sig, hash, provider);
+    return eip1271.isValidSignature(address, sig, hash, provider)
   }
 }

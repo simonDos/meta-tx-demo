@@ -4,6 +4,7 @@ import Icon from "./Icon";
 import ERC20Icon from "./ERC20Icon";
 import eth from "../assets/eth.svg";
 import xdai from "../assets/xdai.png";
+import matic from "../assets/matic.png"
 import { handleSignificantDecimals, convertAmountFromRawNumber } from "../helpers/bignumber";
 
 const SAssetRow = styled.div`
@@ -32,7 +33,9 @@ const AssetRow = (props: any) => {
     asset.symbol && asset.symbol.toLowerCase() === "eth"
       ? eth
       : asset.symbol && asset.symbol.toLowerCase() === "xdai"
-      ? xdai
+        ? xdai
+        : asset.symbol && asset.symbol.toLowerCase() === "matic"
+      ? matic
       : null;
   return (
     <SAssetRow {...props}>

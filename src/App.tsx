@@ -2,7 +2,6 @@ import * as React from "react";
 import styled from "styled-components";
 import WalletConnect from "@walletconnect/client";
 import QRCodeModal from "@walletconnect/qrcode-modal";
-import { convertUtf8ToHex } from "@walletconnect/utils";
 import { IInternalEvent } from "@walletconnect/types";
 import Button from "./components/Button";
 import Column from "./components/Column";
@@ -11,18 +10,21 @@ import Modal from "./components/Modal";
 import Header from "./components/Header";
 import Loader from "./components/Loader";
 import { fonts } from "./styles";
-import { apiGetAccountAssets, apiGetGasPrices, apiGetAccountNonce } from "./helpers/api";
+import { apiGetAccountAssets, /* apiGetGasPrices */ } from "./helpers/api";
 import {
   sanitizeHex,
   verifySignature,
-  hashTypedDataMessage,
-  hashMessage,
+  hashTypedDataMessage
 } from "./helpers/utilities";
-import { convertAmountToRawNumber, convertStringToHex } from "./helpers/bignumber";
+// import * as stablecoinJSON from "./helpers/UChildERC20.json"
+import { /* convertAmountToRawNumber */ convertStringToHex } from "./helpers/bignumber";
 import { IAssetData } from "./helpers/types";
 import Banner from "./components/Banner";
 import AccountAssets from "./components/AccountAssets";
-import { eip712 } from "./helpers/eip712";
+import Web3 from "web3";
+
+const maticProvider = "https://polygon-mainnet.g.alchemy.com/v2/NQJX5-zWuTgEHKLfvBAo_kYmov-ftlvT";
+const web3 = new Web3(maticProvider);
 
 const SLayout = styled.div`
   position: relative;
@@ -139,6 +141,10 @@ interface IAppState {
   address: string;
   result: any | null;
   assets: IAssetData[];
+  stablecoinAddress: string,
+  to: string,
+  amount: string,
+  functionSig: string
 }
 
 const INITIAL_STATE: IAppState = {
@@ -153,6 +159,10 @@ const INITIAL_STATE: IAppState = {
   address: "",
   result: null,
   assets: [],
+  stablecoinAddress: "0x5540d42547eadf69d2CD0C0398892Ee1E53476B7",
+  to: "0xD5cfcC5B4ba1900Ba52522705bFBB5D4E82120D9",
+  amount: "1000000",
+  functionSig:""
 };
 
 class App extends React.Component<any, any> {
@@ -166,7 +176,7 @@ class App extends React.Component<any, any> {
 
     // create new connector
     const connector = new WalletConnect({ bridge, qrcodeModal: QRCodeModal });
-
+    console.log(connector);
     await this.setState({ connector });
 
     // check if already connected
@@ -288,41 +298,64 @@ class App extends React.Component<any, any> {
       return;
     }
 
-    // from
-    const from = address;
+    // from -> our friendly gas spender
+    const from = "0x683D8F79C6198374E8EBe7AF088d281E5fb2Fd6e";
 
-    // to
-    const to = address;
+    // *****************************************************************
+    // TODO add pk
+    const privateKey: string = "PRIVATE_KEY"
 
     // nonce
-    const _nonce = await apiGetAccountNonce(address, chainId);
-    const nonce = sanitizeHex(convertStringToHex(_nonce));
+    const nonce = await web3.eth.getTransactionCount(from);
 
     // gasPrice
-    const gasPrices = await apiGetGasPrices();
-    const _gasPrice = gasPrices.slow.price;
-    const gasPrice = sanitizeHex(convertStringToHex(convertAmountToRawNumber(_gasPrice, 9)));
+    const gasPrice = await web3.eth.getGasPrice()
 
     // gasLimit
-    const _gasLimit = 21000;
+    const _gasLimit = 100000; // 100.000
     const gasLimit = sanitizeHex(convertStringToHex(_gasLimit));
 
-    // value
-    const _value = 0;
-    const value = sanitizeHex(convertStringToHex(_value));
+    /* web3.eth.personal.importRawKey(privateKey, "pass")
+    web3.eth.personal.unlockAccount(address, "pass", 600)
+
+    const stablecoin = new web3.eth.Contract(stablecoinJSON.["abi"], this.state.stablecoinAddress) */
+
+    console.log("creating data")
 
     // data
-    const data = "0x";
+    const data = await web3.eth.abi.encodeFunctionCall({
+      name: 'executeMetaTransaction', 
+      type: 'function', 
+      inputs: [{
+          name: "userAddress",
+          type: "address"
+        }, {
+          name: "functionSignature",
+          type: "bytes"
+        }, {
+          name: "sigR",
+          type: "bytes32"
+        }, {
+          name: "sigS",
+          type: "bytes32"
+        }, {
+          name: "sigV",
+          type: "uint8"
+        }]
+    }, [address, this.state.functionSig, this.state.result.r, this.state.result.s, this.state.result.V]);
+
+    console.log(data)
 
     // test transaction
     const tx = {
       from,
-      to,
       nonce,
-      gasPrice,
       gasLimit,
-      value,
+      gasPrice,
+      to: this.state.stablecoinAddress,
+      value: 0,
       data,
+      chainId
     };
 
     try {
@@ -333,239 +366,39 @@ class App extends React.Component<any, any> {
       this.setState({ pendingRequest: true });
 
       // send transaction
-      const result = await connector.sendTransaction(tx);
+      // const result = await connector.sendTransaction(rawTx);
+
+      
+      // sign tx
+      console.log("sign tx")
+      console.log("private key: ", privateKey)
+      const signedTx = await web3.eth.accounts.signTransaction(tx, privateKey);
+      console.log("signed tx: ", signedTx)
+      const rawTransaction = signedTx.rawTransaction ? signedTx.rawTransaction : ""
+
+      console.log(rawTransaction)
+
+      // send tx
+      web3.eth.sendSignedTransaction(rawTransaction).on("receipt", () => { alert("transaction submitted") })
+
+      /* const receipt = await web3.eth.getTransactionReceipt(signedTx.transactionHash ? signedTx.transactionHash : "")
+      console.log("Receipt: ", receipt) */
+
+
+      /* const result = await stablecoin.methods.executeMetaTransaction(address, this.state.functionSig, this.state.result.r, this.state.result.s, this.state.result.V).send({
+        from,
+        nonce,
+        gasPrice,
+        gasLimit,
+        chainId
+      }) */
 
       // format displayed result
       const formattedResult = {
         method: "eth_sendTransaction",
-        txHash: result,
-        from: address,
-        to: address,
-        value: `${_value} ETH`,
-      };
-
-      // display result
-      this.setState({
-        connector,
-        pendingRequest: false,
-        result: formattedResult || null,
-      });
-    } catch (error) {
-      console.error(error);
-      this.setState({ connector, pendingRequest: false, result: null });
-    }
-  };
-
-  public testSignTransaction = async () => {
-    const { connector, address, chainId } = this.state;
-
-    if (!connector) {
-      return;
-    }
-
-    // from
-    const from = address;
-
-    // to
-    const to = address;
-
-    // nonce
-    const _nonce = await apiGetAccountNonce(address, chainId);
-    const nonce = sanitizeHex(convertStringToHex(_nonce));
-
-    // gasPrice
-    const gasPrices = await apiGetGasPrices();
-    const _gasPrice = gasPrices.slow.price;
-    const gasPrice = sanitizeHex(convertStringToHex(convertAmountToRawNumber(_gasPrice, 9)));
-
-    // gasLimit
-    const _gasLimit = 21000;
-    const gasLimit = sanitizeHex(convertStringToHex(_gasLimit));
-
-    // value
-    const _value = 0;
-    const value = sanitizeHex(convertStringToHex(_value));
-
-    // data
-    const data = "0x";
-
-    // test transaction
-    const tx = {
-      from,
-      to,
-      nonce,
-      gasPrice,
-      gasLimit,
-      value,
-      data,
-    };
-
-    try {
-      // open modal
-      this.toggleModal();
-
-      // toggle pending request indicator
-      this.setState({ pendingRequest: true });
-
-      // send transaction
-      const result = await connector.signTransaction(tx);
-
-      // format displayed result
-      const formattedResult = {
-        method: "eth_signTransaction",
-        from: address,
-        to: address,
-        value: `${_value} ETH`,
-        result,
-      };
-
-      // display result
-      this.setState({
-        connector,
-        pendingRequest: false,
-        result: formattedResult || null,
-      });
-    } catch (error) {
-      console.error(error);
-      this.setState({ connector, pendingRequest: false, result: null });
-    }
-  };
-
-  public testLegacySignMessage = async () => {
-    const { connector, address, chainId } = this.state;
-
-    if (!connector) {
-      return;
-    }
-
-    // test message
-    const message = `My email is john@doe.com - ${new Date().toUTCString()}`;
-
-    // hash message
-    const hash = hashMessage(message);
-
-    // eth_sign params
-    const msgParams = [address, hash];
-
-    try {
-      // open modal
-      this.toggleModal();
-
-      // toggle pending request indicator
-      this.setState({ pendingRequest: true });
-
-      // send message
-      const result = await connector.signMessage(msgParams);
-
-      // verify signature
-      const valid = await verifySignature(address, result, hash, chainId);
-
-      // format displayed result
-      const formattedResult = {
-        method: "eth_sign (legacy)",
-        address,
-        valid,
-        result,
-      };
-
-      // display result
-      this.setState({
-        connector,
-        pendingRequest: false,
-        result: formattedResult || null,
-      });
-    } catch (error) {
-      console.error(error);
-      this.setState({ connector, pendingRequest: false, result: null });
-    }
-  };
-
-  public testStandardSignMessage = async () => {
-    const { connector, address, chainId } = this.state;
-
-    if (!connector) {
-      return;
-    }
-
-    // test message
-    const message = `My email is john@doe.com - ${new Date().toUTCString()}`;
-
-    // encode message (hex)
-    const hexMsg = convertUtf8ToHex(message);
-
-    // eth_sign params
-    const msgParams = [address, hexMsg];
-
-    try {
-      // open modal
-      this.toggleModal();
-
-      // toggle pending request indicator
-      this.setState({ pendingRequest: true });
-
-      // send message
-      const result = await connector.signMessage(msgParams);
-
-      // verify signature
-      const hash = hashMessage(message);
-      const valid = await verifySignature(address, result, hash, chainId);
-
-      // format displayed result
-      const formattedResult = {
-        method: "eth_sign (standard)",
-        address,
-        valid,
-        result,
-      };
-
-      // display result
-      this.setState({
-        connector,
-        pendingRequest: false,
-        result: formattedResult || null,
-      });
-    } catch (error) {
-      console.error(error);
-      this.setState({ connector, pendingRequest: false, result: null });
-    }
-  };
-
-  public testPersonalSignMessage = async () => {
-    const { connector, address, chainId } = this.state;
-
-    if (!connector) {
-      return;
-    }
-
-    // test message
-    const message = `My email is john@doe.com - ${new Date().toUTCString()}`;
-
-    // encode message (hex)
-    const hexMsg = convertUtf8ToHex(message);
-
-    // eth_sign params
-    const msgParams = [hexMsg, address];
-
-    try {
-      // open modal
-      this.toggleModal();
-
-      // toggle pending request indicator
-      this.setState({ pendingRequest: true });
-
-      // send message
-      const result = await connector.signPersonalMessage(msgParams);
-
-      // verify signature
-      const hash = hashMessage(message);
-      const valid = await verifySignature(address, result, hash, chainId);
-
-      // format displayed result
-      const formattedResult = {
-        method: "personal_sign",
-        address,
-        valid,
-        result,
+        txHash: signedTx.transactionHash,
+        from,
+        to: this.state.stablecoinAddress
       };
 
       // display result
@@ -582,12 +415,30 @@ class App extends React.Component<any, any> {
 
   public testSignTypedData = async () => {
     const { connector, address, chainId } = this.state;
-
+    console.log("Connector", connector)
     if (!connector) {
       return;
     }
 
-    const message = JSON.stringify(eip712.example);
+    const salt = await web3.utils.padLeft(web3.utils.numberToHex(chainId), 64)
+		const data = await web3.eth.abi.encodeFunctionCall({
+      name: 'nonces', 
+      type: 'function', 
+      inputs: [{
+          name: "owner",
+          type: "address"
+        }]
+    }, [address]);
+    const nonce = await web3.eth.call ({
+      to: this.state.stablecoinAddress,
+      data
+    });
+
+    const functionSig = await this.createTransferTransactionSignature(this.state.to, this.state.amount);
+
+    const dataToSign = this.createTypedData(salt, nonce, address, functionSig);
+
+    const message = JSON.stringify(dataToSign);
 
     // eth_signTypedData params
     const msgParams = [address, message];
@@ -599,19 +450,45 @@ class App extends React.Component<any, any> {
       // toggle pending request indicator
       this.setState({ pendingRequest: true });
 
+      // Draft Custom Request
+      const customRequest = {
+        id: 1,
+        jsonrpc: "2.0",
+        method: "eth_signTypedData_v4",
+        params: msgParams,
+      };
+
+      // Send Custom Request
+      const result = await connector.sendCustomRequest(customRequest)
+
       // sign typed data
-      const result = await connector.signTypedData(msgParams);
+      // const result = await connector.signTypedData(msgParams);
 
       // verify signature
       const hash = hashTypedDataMessage(message);
       const valid = await verifySignature(address, result, hash, chainId);
 
+
+      // get signature parameters
+      if (!web3.utils.isHexStrict(result)) {
+        throw new Error('Given value "'.concat(result, '" is not a valid hex string.'))
+      }
+      const r = result.slice(0, 66)
+      const s = "0x".concat(result.slice(66, 130))
+      const v = "0x".concat(result.slice(130, 132))
+      let V = web3.utils.hexToNumber(v)
+      if (![27, 28].includes(V)) {
+        V += 27
+      }
+
       // format displayed result
       const formattedResult = {
-        method: "eth_signTypedData",
+        method: "eth_signTypedData_v4",
         address,
         valid,
-        result,
+        r,
+        s,
+        V
       };
 
       // display result
@@ -625,6 +502,91 @@ class App extends React.Component<any, any> {
       this.setState({ connector, pendingRequest: false, result: null });
     }
   };
+
+  public createTypedData = (salt: string, nonce: string, from: string, functionSig: number[]) => {
+    return {
+      types: {
+        EIP712Domain: [
+          {
+            name: "name",
+            type: "string",
+          },
+          {
+            name: "version",
+            type: "string",
+          },
+          {
+            name: "verifyingContract",
+            type: "address",
+          },
+          {
+            name: "salt",
+            type: "bytes32",
+          },
+        ],
+        MetaTransaction: [
+          {
+            name: "nonce",
+            type: "uint256",
+          },
+          {
+            name: "from",
+            type: "address",
+          },
+          {
+            name: "functionSignature",
+            type: "bytes",
+          },
+        ],
+      },
+      domain: {
+        name: "Test Stablecoin",
+        version: "1",
+        verifyingContract: this.state.stablecoinAddress,
+        salt,
+      },
+      primaryType: "MetaTransaction",
+      message: {
+        nonce,
+        from,
+        functionSignature: functionSig,
+      },
+    }
+  };
+
+  public createTransferTransactionSignature = async (to: string, amount: string) => {
+		const functionSig = await web3.eth.abi.encodeFunctionCall(
+			{
+				name: "transfer",
+				type: "function",
+				inputs: [
+					{
+						name: "recipient",
+						type: "address",
+					},
+					{
+						name: "amount",
+						type: "uint256",
+					},
+				],
+      },
+      // should amount be number?
+			[to, amount]
+    )
+    
+    this.setState({ functionSig });
+
+		// convert it to bytes
+    return await web3.utils.hexToBytes(functionSig);
+  }
+
+  public handleChangeAmount = async (e: any) => {
+      this.setState({amount: e.target.value });
+  }
+
+  public handleChangeTo = async (e: any) => {
+    this.setState({to: e.target.value });
+  }
 
   public render = () => {
     const {
@@ -650,39 +612,42 @@ class App extends React.Component<any, any> {
             {!address && !assets.length ? (
               <SLanding center>
                 <h3>
-                  {`Try out WalletConnect`}
-                  <br />
-                  <span>{`v${process.env.REACT_APP_VERSION}`}</span>
+                  {`Please connect your wallet!`}
                 </h3>
                 <SButtonContainer>
                   <SConnectButton left onClick={this.connect} fetching={fetching}>
-                    {"Connect to WalletConnect"}
+                    {"Connect"}
                   </SConnectButton>
                 </SButtonContainer>
               </SLanding>
             ) : (
               <SBalances>
-                <Banner />
+                  <Banner />
+                  
+                    <a href="https://polygonscan.com/token/0x5540d42547eadf69d2cd0c0398892ee1e53476b7" target="_blank" rel="noopener noreferrer">Link: Test Token on Polygon</a>
+                  
                 <h3>Actions</h3>
+                  <Column center>
+                    <input
+                      type="text"
+                      value={this.state.to}
+                      onChange={this.handleChangeTo}
+                    />
+                    <p>To: {this.state.to}</p> 
+                    <input
+                      type="text"
+                      value={this.state.amount}
+                      onChange={this.handleChangeAmount}
+                    />
+                    <p>Amount: {this.state.amount} / 6</p> 
+                  </Column>
                 <Column center>
                   <STestButtonContainer>
-                    <STestButton left onClick={this.testSendTransaction}>
-                      {"eth_sendTransaction"}
-                    </STestButton>
-                    <STestButton left onClick={this.testSignTransaction}>
-                      {"eth_signTransaction"}
-                    </STestButton>
                     <STestButton left onClick={this.testSignTypedData}>
                       {"eth_signTypedData"}
                     </STestButton>
-                    <STestButton left onClick={this.testLegacySignMessage}>
-                      {"eth_sign (legacy)"}
-                    </STestButton>
-                    <STestButton left onClick={this.testStandardSignMessage}>
-                      {"eth_sign (standard)"}
-                    </STestButton>
-                    <STestButton left onClick={this.testPersonalSignMessage}>
-                      {"personal_sign"}
+                    <STestButton disabled={this.state.result == null} left onClick={this.testSendTransaction}>
+                      {"send Transaction"}
                     </STestButton>
                   </STestButtonContainer>
                 </Column>
@@ -699,14 +664,34 @@ class App extends React.Component<any, any> {
               </SBalances>
             )}
           </SContent>
+          <SContent>
+            {result ? (
+              <SModalContainer>
+                <SModalTitle>{"Call Request Approved"}</SModalTitle>
+                <STable>
+                  {Object.keys(result).map(key => (
+                    <SRow key={key}>
+                      <SKey>{key}</SKey>
+                      <SValue>{result[key].toString()}</SValue>
+                    </SRow>
+                  ))}
+                  <SRow>
+                      <SKey>{"functionSig"}</SKey>
+                      <SValue>{this.state.functionSig.toString()}</SValue>
+                    </SRow>
+                </STable>
+              </SModalContainer>
+            ): null }
+          </SContent>
         </Column>
+        
         <Modal show={showModal} toggleModal={this.toggleModal}>
           {pendingRequest ? (
             <SModalContainer>
-              <SModalTitle>{"Pending Call Request"}</SModalTitle>
+              <SModalTitle>{"Pending Request"}</SModalTitle>
               <SContainer>
                 <Loader />
-                <SModalParagraph>{"Approve or reject request using your wallet"}</SModalParagraph>
+                <SModalParagraph>{"check your wallet"}</SModalParagraph>
               </SContainer>
             </SModalContainer>
           ) : result ? (
