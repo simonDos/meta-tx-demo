@@ -315,11 +315,6 @@ class App extends React.Component<any, any> {
     const _gasLimit = 100000; // 100.000
     const gasLimit = sanitizeHex(convertStringToHex(_gasLimit));
 
-    /* web3.eth.personal.importRawKey(privateKey, "pass")
-    web3.eth.personal.unlockAccount(address, "pass", 600)
-
-    const stablecoin = new web3.eth.Contract(stablecoinJSON.["abi"], this.state.stablecoinAddress) */
-
     console.log("creating data")
 
     // data
@@ -365,33 +360,20 @@ class App extends React.Component<any, any> {
       // toggle pending request indicator
       this.setState({ pendingRequest: true });
 
-      // send transaction
-      // const result = await connector.sendTransaction(rawTx);
 
-      
       // sign tx
       console.log("sign tx")
       console.log("private key: ", privateKey)
-      const signedTx = await web3.eth.accounts.signTransaction(tx, privateKey);
-      console.log("signed tx: ", signedTx)
-      const rawTransaction = signedTx.rawTransaction ? signedTx.rawTransaction : ""
+      
+      const signedTx = {} // TODO
 
+      console.log("signed tx: ", signedTx)
+
+      const rawTransaction = signedTx.rawTransaction ? signedTx.rawTransaction : ""
       console.log(rawTransaction)
 
       // send tx
-      web3.eth.sendSignedTransaction(rawTransaction).on("receipt", () => { alert("transaction submitted") })
-
-      /* const receipt = await web3.eth.getTransactionReceipt(signedTx.transactionHash ? signedTx.transactionHash : "")
-      console.log("Receipt: ", receipt) */
-
-
-      /* const result = await stablecoin.methods.executeMetaTransaction(address, this.state.functionSig, this.state.result.r, this.state.result.s, this.state.result.V).send({
-        from,
-        nonce,
-        gasPrice,
-        gasLimit,
-        chainId
-      }) */
+      // TODO
 
       // format displayed result
       const formattedResult = {
@@ -420,7 +402,8 @@ class App extends React.Component<any, any> {
       return;
     }
 
-    const salt = await web3.utils.padLeft(web3.utils.numberToHex(chainId), 64)
+    const salt = "0x0" // TODO
+
 		const data = await web3.eth.abi.encodeFunctionCall({
       name: 'nonces', 
       type: 'function', 
@@ -525,59 +508,25 @@ class App extends React.Component<any, any> {
           },
         ],
         MetaTransaction: [
-          {
-            name: "nonce",
-            type: "uint256",
-          },
-          {
-            name: "from",
-            type: "address",
-          },
-          {
-            name: "functionSignature",
-            type: "bytes",
-          },
+          // TODO
         ],
       },
       domain: {
-        name: "Test Stablecoin",
+        name: "", // TODO
         version: "1",
-        verifyingContract: this.state.stablecoinAddress,
+        verifyingContract: // TODO,
         salt,
       },
       primaryType: "MetaTransaction",
       message: {
-        nonce,
-        from,
-        functionSignature: functionSig,
+        // TODO
       },
     }
   };
 
   public createTransferTransactionSignature = async (to: string, amount: string) => {
-		const functionSig = await web3.eth.abi.encodeFunctionCall(
-			{
-				name: "transfer",
-				type: "function",
-				inputs: [
-					{
-						name: "recipient",
-						type: "address",
-					},
-					{
-						name: "amount",
-						type: "uint256",
-					},
-				],
-      },
-      // should amount be number?
-			[to, amount]
-    )
-    
-    this.setState({ functionSig });
-
-		// convert it to bytes
-    return await web3.utils.hexToBytes(functionSig);
+		// TODO
+    return [];
   }
 
   public handleChangeAmount = async (e: any) => {
